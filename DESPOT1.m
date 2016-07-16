@@ -1,15 +1,12 @@
 %% DESPOT1 to estimate T1 and proton density Mo
 %
 %   Input:
-%           -   S: T1-weighted signal
+%           -   S: Set of T1-weighted signals from different flip angles,
+%                  pixel-based
 %           -   FA: Set of flip angles used corresponding to S
-%           -   TR: TR of protocol (ms)
-%           -   flag: Prior knowledge of fat/water distribution 
-%                       - 0: No prior knowledge
-%                       - 1: Water dominated pixel
-%                       - 2: Fat dominated pixel
+%           -   TR: TR of sequence (ms or s)
 %   Output:
-%           -   T1: Calcuted T1 (ms)
+%           -   T1: Calcuted T1 (same as TR)
 %           -   Mo: Calculated proton density
 %
 %   Linear fitting of y = ax+b
@@ -18,63 +15,50 @@
 %
 %   Author: Kwok-shing Chan @ University of Aberdeen
 %   Date created: Jan 11, 2016
+%   Date last edited: July 15, 2016
 %
-function [T1, Mo] = DESPOT1(S, FA, TR, flag)
+function [T1, Mo] = DESPOT1(S, FA, TR)
     if length(S) < 2
         display('Only one point to fit.');
     end
-    if nargin <4
-        flag = 0;
-    end
-    fun = @(c) c(1).*(S./tand(FA)) + c(2) - (S./sind(FA));
     
-    opts = optimset('lsqcurvefit');
-    options = optimset(opts,'Display','off','MaxIter',20);
-    if flag == 0
+    opts = optimset('lsqnonlin');
+    options = optimset(opts,'Display','off','MaxIter',100);
+
     %% Test for fat T1
-    E1f_0 = exp(-TR/371);   E1_lb = exp(-TR/80);  E1_ub = exp(-TR/2000);
-    Mof_0 = mean(S.*((1-E1f_0.*cosd(FA))./((1-E1f_0).*sind(FA))));
+    E1_lb = exp(-TR/40e-3);  E1_ub = exp(-TR/5000e-3);
+    [T10, Mo0] = DESPOT1_QuickEsti(abs(S),FA,TR);
 
-    c0 = [E1f_0, (1-E1f_0)*Mof_0];
-    lb = [E1_lb, (1-E1_ub)*Mof_0];
-    ub = [E1_ub, (1-E1_lb)*Mof_0];
-    [c1, resnorm1] = lsqnonlin(fun,c0,lb,ub,options);
-    %% Test for water T1
-    E1w_0 = exp(-TR/1275);
-    Mow_0 = mean(S.*((1-E1w_0.*cosd(FA))./((1-E1w_0).*sind(FA))));
+    c0 = [exp(-TR./T10), Mo0];
+    lb = [E1_lb, min(S)];
+    ub = [E1_ub, 2*Mo0];
+    [res, norm] = lsqnonlin(@(x)fitError_DESPOT1(x,S,FA), c0,lb,ub,options);
 
-    c0 = [E1w_0, (1-E1w_0)*Mow_0];
-    lb = [E1_lb, (1-E1_ub)*Mow_0];
-    ub = [E1_ub, (1-E1_lb)*Mow_0];
-    
-    [c2, resnorm2] = lsqnonlin(fun,c0,lb,ub,options);
-    
-    %% Comparing the sos residue
-    if resnorm1 <= resnorm2
-        c = c1;
-    else 
-        c = c2;
-    end
-    elseif flag == 2
-        E1f_0 = exp(-TR/371);   E1_lb = exp(-TR/80);  E1_ub = exp(-TR/500);
-        Mof_0 = mean(S.*((1-E1f_0.*cosd(FA))./((1-E1f_0).*sind(FA))));
+        T1 = abs(-TR./log(res(1)));
+        Mo = abs(res(2));
 
-        c0 = [E1f_0, (1-E1f_0)*Mof_0];
-        lb = [E1_lb, (1-E1_ub)*Mof_0];
-        ub = [E1_ub, (1-E1_lb)*Mof_0];
-        [c] = lsqnonlin(fun,c0,lb,ub,options);
-    elseif flag == 1
-        E1w_0 = exp(-TR/1275); E1_lb = exp(-TR/500);  E1_ub = exp(-TR/2000);
-        Mow_0 = mean(S.*((1-E1w_0.*cosd(FA))./((1-E1w_0).*sind(FA))));
+function [T1map, Momap] = DESPOT1_QuickEsti(S,FA,TR)
 
-        c0 = [E1w_0, (1-E1w_0)*Mow_0];
-        lb = [E1_lb, (1-E1_ub)*Mow_0];
-        ub = [E1_ub, (1-E1_lb)*Mow_0];
-    
-        [c] = lsqnonlin(fun,c0,lb,ub,options);
-    end
-    m = c(1);
-    b = c(2);
-    T1 = -TR/log(m);
-    Mo = b/(1-m);
-end
+x = S./tand(FA);
+y = S./sind(FA);
+
+y_diff = y(2) - y(1);
+x_diff = x(2) - x(1);
+
+m = y_diff./x_diff;
+
+T1 = -TR./log(m);
+T1(isnan(T1)) = 0;
+T1(T1>5) = 5;
+T1map = abs(T1);
+
+m_new = exp(-TR./T1);
+Momap = mean((y-repmat(m_new,2,1).*x)./(1-repmat(m_new,2,1)));
+
+function [fiter] = fitError_DESPOT1(x,S_meas,FA)
+E1 = x(1);
+Mo = x(2);
+
+S_fit = E1.*(S_meas./tand(FA))+Mo*(1-E1);
+fiter = S_fit - S_meas./sind(FA);
+
