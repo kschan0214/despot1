@@ -1,10 +1,11 @@
 %% DESPOT1 to estimate T1 and proton density Mo
-%
+%   [T1, Mo] = DESPOT1(S, FA, TR, rangeTR)
 %   Input:
 %           -   S: Set of T1-weighted signals from different flip angles,
 %                  pixel-based
 %           -   FA: Set of flip angles used corresponding to S
-%           -   TR: TR of sequence (ms or s)
+%           -   TR: TR of sequence (s)
+%           -   rangeTR: range of possible TR (optional)
 %   Output:
 %           -   T1: Calcuted T1 (same as TR)
 %           -   Mo: Calculated proton density
@@ -17,7 +18,7 @@
 %   Date created: Jan 11, 2016
 %   Date last edited: July 15, 2016
 %
-function [T1, Mo] = DESPOT1(S, FA, TR)
+function [T1, Mo] = DESPOT1(S, FA, TR, rangeTR)
     if length(S) < 2
         display('Only one point to fit.');
     end
@@ -26,10 +27,13 @@ function [T1, Mo] = DESPOT1(S, FA, TR)
     options = optimset(opts,'Display','off','MaxIter',100);
 
     %% Test for fat T1
-    E1_lb = exp(-TR/40e-3);  E1_ub = exp(-TR/5000e-3);
     [T10, Mo0] = DESPOT1_QuickEsti(abs(S),FA,TR);
-
     c0 = [exp(-TR./T10), Mo0];
+    if nargin<4
+        E1_lb = exp(-TR/40e-3);  E1_ub = exp(-TR/5000e-3);
+    else
+        E1_lb = exp(-TR/rangeTR(1));  E1_ub = exp(-TR/rangeTR(2));
+    end
     lb = [E1_lb, min(S)];
     ub = [E1_ub, 2*Mo0];
     [res, norm] = lsqnonlin(@(x)fitError_DESPOT1(x,S,FA), c0,lb,ub,options);
