@@ -1,4 +1,5 @@
 %% Calculation of Ernst angle with knwon T1 and TR
+%% function EA = ernst_angle(T1,TR)
 %   Input:
 %           -   T1: (same unit as TR)
 %           -   TR: (same unit as T1)

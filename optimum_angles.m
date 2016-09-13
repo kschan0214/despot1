@@ -1,4 +1,5 @@
 %% Calculation of optimum flip angles based on S1=S2
+%% FA = optimum_angles(T1, TR)
 %
 %   Input:
 %           -   T1: (same unit as TR)
