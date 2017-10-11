@@ -1,7 +1,4 @@
 %% [t1, m0] = DESPOT1(S,FA,TR,varargin)
-%
-% Usage:
-%   [T1, Mo] = DESPOT1(S, FA, TR,'range',rangeT1,'option',options);
 % 
 % Input
 % ----------
@@ -11,7 +8,7 @@
 % Flags     :
 %   'range'     -   boundary of T1
 %   'option'    -   fitting option
-%   **solver choice**
+%   **solver choices**
 %   'regression'	: using mldivide to solve b=x\y (default) (fastest)
 %   'lsqnonneg'     : nonnegative linear least-squares (fast)
 %   'lsqnonlin'     : nonlinear least square (slow)
@@ -65,7 +62,7 @@ switch solver
         t1 = -TR/log(b(1));
         m0 = b(2)/(1-exp(-TR/t1));
     case 'lsqnonlin'
-        %% Obtain initial guesses
+        % Obtain initial guesses
         b = x\y;
         t10 = -TR/log(b(1));
         m00 = b(2)/(1-exp(-TR/t10));
