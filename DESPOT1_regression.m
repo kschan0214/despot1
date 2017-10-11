@@ -17,6 +17,10 @@
 %
 %
 function [t1,m0]=DESPOT1_regression(S,FA,TR)
+S = single(S);
+FA = single(FA);
+TR = single(TR);
+
 y = S(:)./sind(FA(:));
 x = S(:)./tand(FA(:));
 B = ones(length(S),2);

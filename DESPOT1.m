@@ -48,8 +48,8 @@ end
 %% fast estimation by fitting to straightline
 function [T1map, Momap] = DESPOT1_QuickEsti(S,FA,TR,T1_ub,T1_lb)
 
-x = S./tand(FA);
-y = S./sind(FA);
+x = S(:)./tand(FA(:));
+y = S(:)./sind(FA(:));
 
 y_diff = y(2) - y(1);
 x_diff = x(2) - x(1);
@@ -64,7 +64,7 @@ T1(T1>T1_ub) = T1_ub;
 T1map = abs(T1);
 
 m_new = exp(-TR./T1);
-Momap = mean((y-repmat(m_new,2,1).*x)./(1-repmat(m_new,2,1)));
+Momap = mean((y-repmat(m_new,length(y),1).*x)./(1-repmat(m_new,length(y),1)));
 Momap(isnan(Momap)) = 0;
 Momap(isinf(Momap)) = 0;
 end
