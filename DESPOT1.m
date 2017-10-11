@@ -32,7 +32,7 @@ function [T1, Mo] = DESPOT1(S, FA, TR,varargin)
         error('Only one point to fit.');
     end
     % parse arhument input
-    [T1_lb,T1_ub,option] = parse_vararginDESPOT1(varargin);
+    [T1_lb,T1_ub,option] = parse_varargin_DESPOT1(varargin);
     
     %% Obtain initial guesses
     [T10, Mo0] = DESPOT1_QuickEsti(abs(S),FA,TR,T1_ub,T1_lb);
@@ -80,7 +80,7 @@ fiter = abs(S_fit - S_meas./sind(FA));
 end
 
 %% parse argument input
-function [T1_lb,T1_ub,option] = parse_vararginDESPOT1(arg)
+function [T1_lb,T1_ub,option] = parse_varargin_DESPOT1(arg)
 T1_lb = 0;
 T1_ub = 5;
 fitOption = false;
