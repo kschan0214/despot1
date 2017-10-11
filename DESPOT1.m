@@ -1,4 +1,4 @@
-%% [T1, Mo] = DESPOT1(S, FA, TR,varargin)
+%% [t1, m0] = DESPOT1(S,FA,TR,varargin)
 %
 % Usage:
 %   [T1, Mo] = DESPOT1(S, FA, TR,'range',rangeT1,'option',options);
@@ -11,11 +11,15 @@
 % Flags     :
 %   'range'     -   boundary of T1
 %   'option'    -   fitting option
+%   **solver choice**
+%   'regression'	: using mldivide to solve b=x\y (default) (fastest)
+%   'lsqnonneg'     : nonnegative linear least-squares (fast)
+%   'lsqnonlin'     : nonlinear least square (slow)
 %
 % Output
 % ----------
-% T1        : Calcuted T1 (same as TR)
-% Mo        : Calculated proton density
+% t1        : Calcuted T1 (same as TR)
+% m0        : Calculated proton density
 %
 % DESPOT1 to estimate T1 and proton density Mo
 % Linear fitting of y = ax+b
@@ -25,79 +29,100 @@
 % Kwok-shing Chan @ dccn
 % k.chan@donders.ru.nl
 % Date created: Jan 11, 2016
-% Date last edited: July 14, 2017
+% Date last edited: October 11, 2017
 %
-function [T1, Mo] = DESPOT1(S, FA, TR,varargin)
-    if length(S) < 2
-        error('Only one point to fit.');
-    end
-    % parse arhument input
-    [T1_lb,T1_ub,option] = parse_varargin_DESPOT1(varargin);
-    
-    %% Obtain initial guesses
-    [T10, Mo0] = DESPOT1_QuickEsti(abs(S),FA,TR,T1_ub,T1_lb);
-    c0 = [T10, Mo0];
-    lb = [T1_lb, min(S)];
-    ub = [T1_ub, 2*Mo0];
-    
-    res = lsqnonlin(@(x)fitError_DESPOT1(x,S,FA,TR), c0,lb,ub,option);
-    T1 = abs(res(1));
-    Mo = abs(res(2));
+function [t1, m0] = DESPOT1(S,FA,TR,varargin)
+% check error
+if length(S) < 2
+    error('Only one point to fit.');
+end
+if length(S) ~= length(FA)
+    error('Size of signal is not equal to size of flip angle');
 end
 
-%% fast estimation by fitting to straightline
-function [T1map, Momap] = DESPOT1_QuickEsti(S,FA,TR,T1_ub,T1_lb)
+% parse argument input
+[solver,rangeT1,option] = parse_varargin_DESPOT1(varargin);
 
-x = S(:)./tand(FA(:));
+%% Core
+% DESPOT1 formulation
+S = double(S);
+FA = double(FA);
+TR = double(TR);
+
 y = S(:)./sind(FA(:));
+xCol = S(:)./tand(FA(:));
+x = ones(length(S),2);
+x(:,1) = xCol;
+    
+% solve DESPOT1 using different approach
+switch solver
+    case 'regression'
+        b = x\y;
+        t1 = -TR/log(b(1));
+        m0 = b(2)/(1-exp(-TR/t1));
+    case 'lsqnonneg'
+        b = lsqnonneg(x,y);
+        t1 = -TR/log(b(1));
+        m0 = b(2)/(1-exp(-TR/t1));
+    case 'lsqnonlin'
+        %% Obtain initial guesses
+        b = x\y;
+        t10 = -TR/log(b(1));
+        m00 = b(2)/(1-exp(-TR/t10));
+        T1_lb = rangeT1(1);
+        T1_ub = rangeT1(2);
+        c0 = [t10, m00];
+        lb = [T1_lb, min(S)];
+        ub = [T1_ub, 2*m00];
 
-y_diff = y(2) - y(1);
-x_diff = x(2) - x(1);
-
-m = y_diff./x_diff;
-
-T1 = -TR./log(m);
-T1(isnan(T1)) = T1_lb;
-T1(isinf(T1)) = T1_ub;
-T1(T1<T1_lb) = T1_lb;
-T1(T1>T1_ub) = T1_ub;
-T1map = abs(T1);
-
-m_new = exp(-TR./T1);
-Momap = mean((y-repmat(m_new,length(y),1).*x)./(1-repmat(m_new,length(y),1)));
-Momap(isnan(Momap)) = 0;
-Momap(isinf(Momap)) = 0;
+        res = lsqnonlin(@(x)fitError_DESPOT1(x,S,FA,TR),c0,lb,ub,option);
+        t1 = res(1);
+        m0 = res(2);
+end
+t1 = real(t1);
+m0 = real(m0);
 end
 
-%% compute fitting residual
-function [fiter] = fitError_DESPOT1(x,S_meas,FA, TR)
+%% lsqnonlin: compute fitting residual 
+function [fiter] = fitError_DESPOT1(x,S_meas,FA,TR)
+% grab estimates
 T1 = x(1);
 Mo = x(2);
 
-E1 = exp(-TR/T1);
-S_fit = E1.*(S_meas./tand(FA))+Mo*(1-E1);
-fiter = abs(S_fit - S_meas./sind(FA));
+% simulate signal
+S_fit = Signal_GRE_T1wMono(Mo,FA,T1,TR);
+% compute fiter, using magnitude fitting
+fiter = computeFiter(S_meas,S_fit,length(S_fit));
+
 end
 
 %% parse argument input
-function [T1_lb,T1_ub,option] = parse_varargin_DESPOT1(arg)
-T1_lb = 0;
-T1_ub = 5;
-fitOption = false;
-if ~isempty(arg)
-    for kvar = 1:length(arg)
-        if strcmpi(arg{kvar},'range')
-            range = arg{kvar+1};
-            T1_lb = range(1);
-            T1_ub = range(2);
-        end
-        if strcmpi(arg{kvar},'option')
-            option = arg{kvar+1};
-            fitOption = true;
-        end
+function [solver,rangeT1,option] = parse_varargin_DESPOT1(arg)
+% predefine parameters
+rangeT1 = [0,5];    % in second
+option = [];
+solver = 'regression';
+
+% look for flags and 'Name/Value' pairs
+for kvar = 1:length(arg)
+%     if strcmpi(arg{kvar},'regression')
+%         solver = 'regression';
+%     end
+    if strcmpi(arg{kvar},'lsqnonlin')
+        solver = 'lsqnonlin';
     end
-    if fitOption == false
-        option = optimoptions(@lsqnonlin,'Display','off','Jacobian','off','DerivativeCheck','off','MaxIter',1000);
+    if strcmpi(arg{kvar},'lsqnonneg')
+        solver = 'lsqnonneg';
     end
+    if strcmpi(arg{kvar},'range')
+        rangeT1 = arg{kvar+1};
+    end
+    if strcmpi(arg{kvar},'option')
+        option = arg{kvar+1};
+    end
+end
+% lsqnonlin fitting option
+if isempty(option) && strcmpi(solver,'lsqnonlin')
+    option = optimoptions(@lsqnonlin,'Display','off','Jacobian','off','DerivativeCheck','off','MaxIter',500);
 end
 end
