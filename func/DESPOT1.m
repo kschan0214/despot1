@@ -38,12 +38,12 @@ if length(S) ~= length(FA)
 end
 
 % parse argument input
-[solver,rangeT1,option] = parse_varargin_DESPOT1(varargin);
+[solver,b1,rangeT1,option] = parse_varargin_DESPOT1(varargin);
 
 %% Core
 % DESPOT1 formulation
 S = double(S);
-FA = double(FA);
+FA = double(FA)*b1;
 TR = double(TR);
 
 y = S(:)./sind(FA(:));
@@ -94,9 +94,10 @@ fiter = computeFiter(S_meas,S_fit,length(S_fit));
 end
 
 %% parse argument input
-function [solver,rangeT1,option] = parse_varargin_DESPOT1(arg)
+function [solver,b1,rangeT1,option] = parse_varargin_DESPOT1(arg)
 % predefine parameters
 rangeT1 = [0,5];    % in second
+b1 = 1;
 option = [];
 solver = 'regression';
 
@@ -110,6 +111,9 @@ for kvar = 1:length(arg)
     end
     if strcmpi(arg{kvar},'lsqnonneg')
         solver = 'lsqnonneg';
+    end
+    if strcmpi(arg{kvar},'b1')
+        b1 = arg{kvar+1};
     end
     if strcmpi(arg{kvar},'range')
         rangeT1 = arg{kvar+1};
