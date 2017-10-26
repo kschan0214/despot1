@@ -14,7 +14,7 @@
 % Date last modified:
 %
 function fiter = computeFiter(s,shat,NUM_MAGN)
-if NUM_MAGN == length(s) % Magnitude fitting
+if NUM_MAGN == length(s(:)) % Magnitude fitting
     shat1 = abs(shat);
     s1 = abs(s);
     fiter = shat1(:) - s1(:);
