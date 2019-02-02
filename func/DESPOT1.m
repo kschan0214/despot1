@@ -7,6 +7,7 @@
 % TR        : TR of sequence (s)
 % Flags     :
 %   'range'     -   boundary of T1
+%   'b1'        -   B1 map
 %   'option'    -   fitting option
 %   **solver choices**
 %   'regression'	: using mldivide to solve b=x\y (default) (fastest)
@@ -26,7 +27,7 @@
 % Kwok-shing Chan @ dccn
 % k.chan@donders.ru.nl
 % Date created: Jan 11, 2016
-% Date last edited: October 11, 2017
+% Date last edited: 20 February, 2017
 %
 function [t1, m0] = DESPOT1(S,FA,TR,varargin)
 % check error
