@@ -1,17 +1,18 @@
-%% [t1, m0] = despot1_mapping(img,fa,tr,mask,b1)
+%% [t1, m0, mask_fitted] = despot1_mapping(img,fa,tr,mask,b1)
 %
 % Input
 % --------------
 % img           : magnitude image, 4D [row,col,slice,flip_angle]
 % fa            : flip angle in degree
 % tr            : repetition time, either ms or s
-% mask          : signal mask
-% b1            : B1 map
+% mask          : signal mask, optional
+% b1            : B1 map, optional
 %
 % Output
 % --------------
 % t1            : T1 map, unit depends on tr
 % m0            : proton density map
+% mask_fitted   : mask of fitted voxels without encountering error
 %
 % Description: T1 mapping using DESPOT1 formalism
 %
@@ -19,9 +20,9 @@
 % k.chan@donders.ru.nl
 % Date created: 30 Oct 2020
 % Date modified: 17 Nov 2020
+% Date modified: 21 July 2022
 %
-%
-function [t1, m0] = despot1_mapping(img,fa,tr,mask,b1)
+function [t1, m0, mask_fitted] = despot1_mapping(img,fa,tr,mask,b1)
 
 dims = size(img);
 
@@ -55,16 +56,29 @@ for k = 1:size(img,1)
         t1(ind(k)) = 0; m0(ind(k)) = 0;
     end
 end
-t1 = reshape(t1,dims(1:3));
-m0 = reshape(m0,dims(1:3));
+t1      = reshape(t1,dims(1:3));
+m0      = reshape(m0,dims(1:3));
+mask    = reshape(mask,dims(1:3));
 
 % remove physically infeasible values
-t1(t1<0) = 0;
-t1(isnan(t1)) = 0;
-t1(isinf(t1)) = 0;
+mask_fitted            = ones(size(t1));
+mask_fitted(t1<=0)     = 0;                 % T1=0 is also physically not feasible
+mask_fitted(isnan(t1)) = 0;
+mask_fitted(isinf(t1)) = 0;
+mask_fitted(m0<0)      = 0;
+mask_fitted(isnan(m0)) = 0;
+mask_fitted(isinf(m0)) = 0;
+mask_fitted            = mask_fitted .* mask;
 
-m0(m0<0) = 0;
-m0(isnan(m0)) = 0;
-m0(isinf(m0)) = 0;
+t1 = t1 .* mask_fitted;
+m0 = m0 .* mask_fitted;
+ 
+% t1(t1<0) = 0;
+% t1(isnan(t1)) = 0;
+% t1(isinf(t1)) = 0;
+% 
+% m0(m0<0) = 0;
+% m0(isnan(m0)) = 0;
+% m0(isinf(m0)) = 0;
 
 end
